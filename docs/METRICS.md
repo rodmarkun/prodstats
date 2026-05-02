@@ -66,12 +66,15 @@ So if Hermes and Claude are active for the same 60 seconds, agent active time in
 
 ## Git pushes today
 
-V1 counts successful terminal `git push` commands through shell integration.
+V1 counts successful `git push` commands through:
+
+- a `~/.local/bin/git` executable shim, which catches non-interactive agent/automation pushes when `~/.local/bin` appears before `/usr/bin` in `PATH`
+- an interactive shell function fallback installed in `~/.bashrc` or `~/.zshrc`
 
 It does not count:
 
 - GUI git clients
-- programs calling `/usr/bin/git` directly while bypassing the shell function
+- programs calling `/usr/bin/git` directly while bypassing `PATH`
 - failed pushes
 - dry-run pushes
 

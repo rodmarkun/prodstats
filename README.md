@@ -92,8 +92,9 @@ prodstats status --watch                 # update in terminal
 prodstats waybar                         # one-line Waybar JSON
 prodstats doctor                         # diagnostics
 prodstats install service                # install user systemd service
+prodstats install git-shim               # install ~/.local/bin/git shim for non-interactive/agent pushes
 prodstats install input-access           # grant evdev input access for APM/actions
-prodstats install shell                  # install git push tracking function
+prodstats install shell                  # install git push tracking function for interactive shells
 prodstats install omarchy --corner top-right
 prodstats install all --corner top-right
 prodstats overlay --corner bottom-right  # writes experimental layer-shell overlay script

@@ -36,7 +36,7 @@ Valid corners are usually:
 3. Installs Rust with rustup if Cargo is missing.
 4. Clones or updates `https://github.com/rodmarkun/prodstats.git` into `~/.local/src/prodstats`.
 5. Runs `cargo install --path ~/.local/src/prodstats`.
-6. Runs `prodstats install all --corner <corner>` unless `--no-install-all` is passed.
+6. Runs `prodstats install all --corner <corner>` unless `--no-install-all` is passed. This installs the service, Waybar/Omarchy integration, shell integration, and the `~/.local/bin/git` shim for agent/non-interactive push tracking.
 7. If `--input-access` is passed, runs `prodstats install input-access` and restarts the user service.
 
 ## Verification

@@ -8,13 +8,40 @@ pub fn shell_snippet() -> &'static str {
 # prodstats git push tracking
 if command -v prodstats >/dev/null 2>&1; then
   git() {
-    command git "$@"
+    PRODSTATS_GIT_WRAPPER_SKIP=1 command git "$@"
     local rc=$?
     prodstats log-git-command "$rc" "$PWD" "$@" >/dev/null 2>&1 || true
     return "$rc"
   }
 fi
 "#
+}
+
+pub fn git_shim_script(real_git: &str, prodstats: &str) -> String {
+    format!(
+        r#"#!/usr/bin/env sh
+# prodstats git executable shim
+# This catches non-interactive agent/automation git pushes that do not source shell rc files.
+REAL_GIT="{real_git}"
+PRODSTATS="{prodstats}"
+
+if [ -n "${{PRODSTATS_GIT_WRAPPER_SKIP:-}}" ]; then
+  exec "$REAL_GIT" "$@"
+fi
+
+if [ "${{1:-}}" = "push" ]; then
+  repo="$PWD"
+  "$REAL_GIT" "$@"
+  rc=$?
+  "$PRODSTATS" log-git-command "$rc" "$repo" "$@" >/dev/null 2>&1 || true
+  exit "$rc"
+fi
+
+exec "$REAL_GIT" "$@"
+"#,
+        real_git = real_git,
+        prodstats = prodstats
+    )
 }
 
 pub fn install_shell_rc(shell_name: Option<&str>) -> Result<PathBuf> {
@@ -32,10 +59,69 @@ pub fn install_shell_rc(shell_name: Option<&str>) -> Result<PathBuf> {
         }
     };
     let old = fs::read_to_string(&rc).unwrap_or_default();
-    if !old.contains("prodstats git push tracking") {
-        fs::write(&rc, format!("{}\n{}", old, shell_snippet()))?;
+    let new_text = replace_or_append_shell_snippet(&old);
+    if new_text != old {
+        fs::write(&rc, new_text)?;
     }
     Ok(rc)
+}
+
+fn replace_or_append_shell_snippet(old: &str) -> String {
+    let marker = "# prodstats git push tracking";
+    if let Some(start) = old.find(marker) {
+        if let Some(end_rel) = old[start..].find("\nfi") {
+            let end = start + end_rel + "\nfi".len();
+            return format!(
+                "{}{}{}",
+                &old[..start],
+                shell_snippet().trim_start(),
+                &old[end..]
+            );
+        }
+    }
+    format!("{}\n{}", old, shell_snippet())
+}
+
+pub fn install_git_shim(binary: &Path) -> Result<PathBuf> {
+    let home = dirs::home_dir().context("home dir not found")?;
+    let dir = home.join(".local/bin");
+    fs::create_dir_all(&dir)?;
+    let shim = dir.join("git");
+    let old = fs::read_to_string(&shim).unwrap_or_default();
+    if shim.exists() && !old.contains("prodstats git executable shim") {
+        anyhow::bail!(
+            "{} already exists and is not managed by prodstats; not overwriting it",
+            shim.display()
+        );
+    }
+    let real_git = real_git_path(&shim)?;
+    fs::write(
+        &shim,
+        git_shim_script(&real_git, &binary.display().to_string()),
+    )?;
+    set_executable(&shim)?;
+    Ok(shim)
+}
+
+fn real_git_path(shim: &Path) -> Result<String> {
+    for candidate in ["/usr/bin/git", "/usr/local/bin/git", "/bin/git"] {
+        let path = Path::new(candidate);
+        if path.exists() && path != shim {
+            return Ok(candidate.to_string());
+        }
+    }
+    anyhow::bail!("could not find system git binary for prodstats shim")
+}
+
+fn set_executable(path: &Path) -> Result<()> {
+    let mut perms = fs::metadata(path)?.permissions();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        perms.set_mode(0o755);
+        fs::set_permissions(path, perms)?;
+    }
+    Ok(())
 }
 
 pub fn systemd_service(binary: &Path) -> String {

@@ -45,6 +45,9 @@ pub fn append_event(path: &Path, event: &GitPushEvent) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
+    if is_recent_duplicate(path, event)? {
+        return Ok(());
+    }
     let exists = path.exists();
     let file = OpenOptions::new()
         .create(true)
@@ -57,6 +60,26 @@ pub fn append_event(path: &Path, event: &GitPushEvent) -> Result<()> {
     writer.serialize(event)?;
     writer.flush()?;
     Ok(())
+}
+
+fn is_recent_duplicate(path: &Path, event: &GitPushEvent) -> Result<bool> {
+    if !path.exists() {
+        return Ok(false);
+    }
+    let mut rdr = csv::Reader::from_path(path)?;
+    let mut last_matching: Option<GitPushEvent> = None;
+    for rec in rdr.deserialize::<GitPushEvent>() {
+        let previous = rec?;
+        if previous.repo == event.repo
+            && previous.remote == event.remote
+            && previous.branch == event.branch
+            && previous.result == event.result
+        {
+            last_matching = Some(previous);
+        }
+    }
+    Ok(last_matching
+        .is_some_and(|previous| (event.timestamp - previous.timestamp).num_seconds().abs() <= 10))
 }
 
 pub fn count_today(path: &Path, now: DateTime<Local>) -> Result<u64> {

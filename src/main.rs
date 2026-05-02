@@ -9,7 +9,8 @@ use prodstats::display::{stale_waybar_json, waybar_json};
 use prodstats::gitlog::{GitPushEvent, append_event, count_today, should_log_git_push};
 use prodstats::input::{ActionCounts, start_evdev_threads};
 use prodstats::install::{
-    install_input_access, install_omarchy, install_shell_rc, install_systemd_service,
+    install_git_shim, install_input_access, install_omarchy, install_shell_rc,
+    install_systemd_service,
 };
 use prodstats::paths::Paths;
 use prodstats::state::{MetricsEngine, MinuteStats};
@@ -68,6 +69,7 @@ enum InstallTarget {
         shell: Option<String>,
     },
     Service,
+    GitShim,
     InputAccess,
     All {
         #[arg(long, default_value = "top-right")]
@@ -264,6 +266,10 @@ fn install(target: InstallTarget) -> Result<()> {
             "Installed systemd service at {}",
             install_systemd_service(&exe)?.display()
         ),
+        InstallTarget::GitShim => println!(
+            "Installed git executable shim at {}",
+            install_git_shim(&exe)?.display()
+        ),
         InstallTarget::InputAccess => print!("{}", install_input_access()?),
         InstallTarget::All { corner } => {
             println!(
@@ -273,6 +279,10 @@ fn install(target: InstallTarget) -> Result<()> {
             println!(
                 "Installed shell integration in {}",
                 install_shell_rc(None)?.display()
+            );
+            println!(
+                "Installed git executable shim at {}",
+                install_git_shim(&exe)?.display()
             );
             print!("{}", install_omarchy(&corner)?);
         }
@@ -341,6 +351,18 @@ fn doctor() -> Result<()> {
         } else {
             format!("ok ({})", shell_files.join(", "))
         }
+    );
+    let shim = dirs::home_dir()
+        .map(|home| home.join(".local/bin/git"))
+        .filter(|path| {
+            fs::read_to_string(path)
+                .map(|text| text.contains("prodstats git executable shim"))
+                .unwrap_or(false)
+        });
+    println!(
+        "git executable shim: {}",
+        shim.map(|path| format!("ok ({})", path.display()))
+            .unwrap_or_else(|| "not found; run prodstats install git-shim".to_string())
     );
     Ok(())
 }
