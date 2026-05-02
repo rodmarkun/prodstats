@@ -1,0 +1,27 @@
+[package]
+name = "prodstats"
+version = "0.1.0"
+edition = "2024"
+description = "Configurable local productivity stats daemon and corner display for Linux/Omarchy"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4", features = ["derive"] }
+csv = "1"
+dirs = "6"
+evdev = "0.13"
+fs2 = "0.4"
+procfs = "0.17"
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+shell-words = "1"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
