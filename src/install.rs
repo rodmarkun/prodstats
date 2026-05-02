@@ -10,7 +10,7 @@ if command -v prodstats >/dev/null 2>&1; then
   git() {
     PRODSTATS_GIT_WRAPPER_SKIP=1 command git "$@"
     local rc=$?
-    prodstats log-git-command "$rc" "$PWD" "$@" >/dev/null 2>&1 || true
+    prodstats log-git-command "$rc" "$PWD" -- "$@" >/dev/null 2>&1 || true
     return "$rc"
   }
 fi
@@ -29,15 +29,11 @@ if [ -n "${{PRODSTATS_GIT_WRAPPER_SKIP:-}}" ]; then
   exec "$REAL_GIT" "$@"
 fi
 
-if [ "${{1:-}}" = "push" ]; then
-  repo="$PWD"
-  "$REAL_GIT" "$@"
-  rc=$?
-  "$PRODSTATS" log-git-command "$rc" "$repo" "$@" >/dev/null 2>&1 || true
-  exit "$rc"
-fi
-
-exec "$REAL_GIT" "$@"
+repo="$PWD"
+"$REAL_GIT" "$@"
+rc=$?
+"$PRODSTATS" log-git-command "$rc" "$repo" -- "$@" >/dev/null 2>&1 || true
+exit "$rc"
 "#,
         real_git = real_git,
         prodstats = prodstats

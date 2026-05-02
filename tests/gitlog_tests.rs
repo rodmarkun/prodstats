@@ -17,6 +17,41 @@ fn logs_successful_push_only() {
 }
 
 #[test]
+fn logs_push_after_git_global_options() {
+    assert!(should_log_git_push(
+        0,
+        &[
+            "-C".into(),
+            "/tmp/repo".into(),
+            "push".into(),
+            "origin".into(),
+            "main".into(),
+        ]
+    ));
+    assert!(should_log_git_push(
+        0,
+        &[
+            "-c".into(),
+            "credential.helper=".into(),
+            "push".into(),
+            "origin".into(),
+            "main".into(),
+        ]
+    ));
+    assert!(!should_log_git_push(
+        0,
+        &[
+            "-C".into(),
+            "/tmp/repo".into(),
+            "push".into(),
+            "--dry-run".into(),
+            "origin".into(),
+            "main".into(),
+        ]
+    ));
+}
+
+#[test]
 fn push_event_parses_remote_and_branch() {
     let event = GitPushEvent::from_args(
         "/tmp/repo".into(),
@@ -27,6 +62,25 @@ fn push_event_parses_remote_and_branch() {
     assert_eq!(event.remote.as_deref(), Some("origin"));
     assert_eq!(event.branch.as_deref(), Some("main"));
     assert_eq!(event.result, "success");
+}
+
+#[test]
+fn push_event_uses_c_option_repo_as_repo_path() {
+    let event = GitPushEvent::from_args(
+        "/tmp".into(),
+        &[
+            "-C".into(),
+            "/tmp/repo".into(),
+            "push".into(),
+            "origin".into(),
+            "main".into(),
+        ],
+    )
+    .unwrap();
+
+    assert_eq!(event.repo, "/tmp/repo");
+    assert_eq!(event.remote.as_deref(), Some("origin"));
+    assert_eq!(event.branch.as_deref(), Some("main"));
 }
 
 #[test]

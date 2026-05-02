@@ -66,7 +66,7 @@ So if Hermes and Claude are active for the same 60 seconds, agent active time in
 
 ## Git pushes today
 
-V1 counts successful `git push` commands through:
+V1 counts successful `git push` commands, including common global-option forms such as `git -C /repo push`, through:
 
 - a `~/.local/bin/git` executable shim, which catches non-interactive agent/automation pushes when `~/.local/bin` appears before `/usr/bin` in `PATH`
 - an interactive shell function fallback installed in `~/.bashrc` or `~/.zshrc`

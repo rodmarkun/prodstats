@@ -50,6 +50,7 @@ enum CommandKind {
     LogGitCommand {
         exit_code: i32,
         cwd: String,
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
     Overlay {

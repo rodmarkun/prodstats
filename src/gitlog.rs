@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, OpenOptions};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GitPushEvent {
@@ -16,17 +16,17 @@ pub struct GitPushEvent {
 
 impl GitPushEvent {
     pub fn from_args(repo: String, args: &[String]) -> Option<Self> {
+        let parsed = parse_git_args(&repo, args)?;
         if !should_log_git_push(0, args) {
             return None;
         }
-        let positional: Vec<&String> = args
+        let positional: Vec<&String> = args[parsed.command_index + 1..]
             .iter()
-            .skip(1)
             .filter(|a| !a.starts_with('-'))
             .collect();
         Some(Self {
             timestamp: Local::now(),
-            repo,
+            repo: parsed.repo,
             remote: positional.first().map(|s| (*s).clone()),
             branch: positional.get(1).map(|s| (*s).clone()),
             result: "success".into(),
@@ -36,9 +36,63 @@ impl GitPushEvent {
 }
 
 pub fn should_log_git_push(exit_code: i32, args: &[String]) -> bool {
+    let Some(parsed) = parse_git_args("", args) else {
+        return false;
+    };
     exit_code == 0
-        && args.first().is_some_and(|a| a == "push")
-        && !args.iter().any(|a| a == "--dry-run" || a == "-n")
+        && args.get(parsed.command_index).is_some_and(|a| a == "push")
+        && !args[parsed.command_index + 1..]
+            .iter()
+            .any(|a| a == "--dry-run" || a == "-n")
+}
+
+#[derive(Debug)]
+struct ParsedGitArgs {
+    command_index: usize,
+    repo: String,
+}
+
+fn parse_git_args(cwd: &str, args: &[String]) -> Option<ParsedGitArgs> {
+    let mut i = 0;
+    let mut repo = PathBuf::from(cwd);
+    while i < args.len() {
+        let arg = &args[i];
+        match arg.as_str() {
+            "-C" => {
+                let path = args.get(i + 1)?;
+                let path = Path::new(path);
+                repo = if path.is_absolute() {
+                    path.into()
+                } else {
+                    repo.join(path)
+                };
+                i += 2;
+            }
+            "-c" | "--config-env" | "--git-dir" | "--work-tree" | "--namespace" => {
+                args.get(i + 1)?;
+                i += 2;
+            }
+            _ if arg.starts_with("--git-dir=")
+                || arg.starts_with("--work-tree=")
+                || arg.starts_with("--namespace=")
+                || arg.starts_with("--config-env=")
+                || arg.starts_with("--exec-path=")
+                || arg.starts_with("-c") && arg.len() > 2 =>
+            {
+                i += 1;
+            }
+            _ if arg.starts_with('-') => {
+                i += 1;
+            }
+            _ => {
+                return Some(ParsedGitArgs {
+                    command_index: i,
+                    repo: repo.to_string_lossy().into_owned(),
+                });
+            }
+        }
+    }
+    None
 }
 
 pub fn append_event(path: &Path, event: &GitPushEvent) -> Result<()> {
